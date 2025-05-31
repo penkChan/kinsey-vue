@@ -7,7 +7,8 @@
     <div class="mask-reveal__layer mask-reveal__layer-1">
       <div class="mask-reveal__layer mask-reveal__layer-2">
         <div class="preloader__wrapper">
-          <div
+          <underline-text ref="underlineText">{{ countValueAddZerosFormatted }}</underline-text>
+          <!-- <div
             ref="counter"
             :class="[
               'preloader__counter',
@@ -20,7 +21,8 @@
             ]"
           >
             {{ countValueAddZerosFormatted }}
-          </div>
+          </div> -->
+
           <div ref="content" class="preloader__content ml-auto mt-auto">
             <div class="h6">Loading</div>
           </div>
@@ -37,6 +39,7 @@ import { useGlobalVariables } from '@/stores/global-variables'
 import { addZeros } from '@/utils/formatter'
 import { gsap } from 'gsap'
 import * as mathjs from 'mathjs'
+import UnderlineText from '@/components/underline-text/underline-text.vue'
 import {
   switchMap,
   first,
@@ -48,11 +51,11 @@ import {
   of,
   Subject,
   combineLatest,
+  throwError,
 } from 'rxjs'
 import { computed, reactive, ref } from 'vue'
 
-const tl = gsap.timeline()
-let backgroundSizeHeight: string | undefined = undefined
+const backgroundSizeHeight: string | undefined = undefined
 const count = reactive({
   width: 'auto',
   val: 0,
@@ -73,7 +76,7 @@ const rxjsComponent = useRxjsComponent()
 const globalEventStore = useGlobalEventsStore()
 const globalVariables = useGlobalVariables()
 const content = ref<HTMLDivElement>()
-const counter = ref<HTMLDivElement>()
+const underlineText = ref<InstanceType<typeof UnderlineText>>()
 
 const finishedSubject$ = new Subject<undefined>()
 
@@ -81,11 +84,14 @@ rxjsComponent.mountedSubject$
   .pipe(
     first(),
     tap(() => globalEventStore.artsPreloaderStartSubject$.next(undefined)),
-    switchMap(() =>
-      merge(
-        new Observable((subscriber) => {
+    switchMap(() => {
+      if (underlineText.value === undefined) {
+        return throwError(() => new Error('underlineText.value is undefined'))
+      }
+      return merge(
+        new Observable((observer) => {
           if (content.value === undefined) {
-            subscriber.error(new Error('content.value is undefined'))
+            observer.error(new Error('content.value is undefined'))
             return
           }
           const tween = gsap.fromTo(
@@ -99,52 +105,36 @@ rxjsComponent.mountedSubject$
               autoAlpha: 1,
               ease: 'power3.out',
               onComplete: () => {
-                subscriber.complete()
+                observer.next(undefined)
+                observer.complete()
               },
             },
           )
           return () => tween.kill()
         }),
-        new Observable((subscriber) => {
-          if (counter.value === undefined) {
-            subscriber.error(new Error('counter.value is undefined'))
-            return
-          }
-          backgroundSizeHeight = window.getComputedStyle(counter.value).backgroundSize.split(' ')[1]
-          const tween = tl
-            .fromTo(
-              counter.value,
-              {
-                autoAlpha: 0,
-              },
-              {
-                duration: 0.3,
-                autoAlpha: 1,
-                y: 0,
-                ease: 'power3.out',
-              },
-              '0',
-            )
-            .to(count, {
-              val: 100,
-              duration: 20,
-              ease: 'power3.out',
-              onComplete: () => {
-                subscriber.complete()
-              },
-            })
+        new Observable((observer) => {
+          const tween = gsap.to(count, {
+            val: 100,
+            duration: 20,
+            ease: 'power3.out',
+            onComplete: () => {
+              observer.next(undefined)
+              observer.complete()
+            },
+          })
           return () => tween.kill()
         }),
-      ),
-    ),
+        underlineText.value.start(),
+      )
+    }),
     catchError((error) => {
       console.error(error)
       return of(undefined)
     }),
-    takeUntil(rxjsComponent.beforeUnmountSubject$),
+    takeUntil(merge(rxjsComponent.beforeUnmountSubject$, finishedSubject$)),
   )
   .subscribe({
-    error: (error) => console.log(error),
+    error: (error) => console.error(error),
     complete: () => {},
   })
 
@@ -156,49 +146,49 @@ combineLatest({
     switchMap(
       () =>
         new Observable((observer) => {
-          const timeScale = globalVariables.animations.timeScale.preloader
-          if (counter.value === undefined) {
-            observer.next(new Error('counter 不能为空'))
+          if (content.value === undefined) {
+            observer.error(new Error('content.value is undefined'))
             return
           }
-          tl.clear()
-            .add([
-              gsap.to(count, {
-                y: 0,
-                autoAlpha: 1,
-                ease: 'power3.out',
-                duration: 0.3,
-                overwrite: true,
-              }),
-            ])
-            .add([
-              gsap.to(counter.value, {
-                onStart: () => {
-                  preloaderCounterStarted.value = false
-                },
-                backgroundSize: `100% ${backgroundSizeHeight}`,
-                duration: 2.4 / timeScale,
-                ease: 'expo.inOut',
-              }),
-              gsap.to(count, {
-                val: 100,
-                duration: 2.4 / timeScale,
-                ease: 'expo.inOut',
-              }),
-            ])
-            .set(counter.value, {
-              backgroundPosition: '100% 100%',
-            })
-            .to(counter.value, {
-              backgroundSize: `0% ${backgroundSizeHeight}`,
-              duration: 1.2,
-              ease: 'expo.inOut',
-            })
+          const tween = gsap.to(content.value, {
+            y: 0,
+            autoAlpha: 1,
+            ease: 'power3.out',
+            duration: 0.3,
+            overwrite: true,
+            onComplete: () => {
+              observer.next(undefined)
+              observer.complete()
+            },
+          })
+          return () => tween.kill()
         }),
     ),
+    switchMap(() => {
+      if (underlineText.value === undefined) {
+        return throwError(() => new Error('underlineText.value is undefined'))
+      }
+      return merge(
+        new Observable((observer) => {
+          const tween = gsap.to(count, {
+            val: 100,
+            duration: 2.4 / globalVariables.animations.timeScale.preloader,
+            ease: 'expo.inOut',
+            onComplete: () => {
+              observer.complete()
+            },
+          })
+          return () => tween.kill()
+        }),
+        underlineText.value.finish(),
+      )
+    }),
     takeUntil(rxjsComponent.beforeUnmountSubject$),
   )
-  .subscribe()
+  .subscribe({
+    error: (error) => console.error(error),
+    complete: () => {},
+  })
 
 function finished() {
   finishedSubject$.next(undefined)
@@ -237,15 +227,15 @@ defineExpose({
     bottom: calc(var(--fix-bar-vh) + var(--gutter-vertical));
   }
   &__counter {
+    // @include mixins.fluid-type(96, 212);
     font-family: var(--font-primary);
     font-weight: 100;
     line-height: 1;
-    @include mixins.fluid-type(96, 212);
-    letter-spacing: -10px; // opacity: 0
+    letter-spacing: -10px;
     white-space: nowrap;
   }
   .backgrond-underline {
-    width: 340px;
+    width: 100px;
     &.preloader__counter {
       &_started {
         animation-name: loading;
@@ -268,6 +258,11 @@ defineExpose({
         background-size: 100% 2px;
       }
     }
+  }
+  .underline-text {
+    font-size: 150px;
+    width: 350px;
+    align-self: flex-end;
   }
 }
 </style>
