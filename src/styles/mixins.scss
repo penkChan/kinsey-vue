@@ -1,0 +1,21 @@
+@use './variables.scss' as variables;
+@use './functions.scss' as functions;
+
+@mixin fluid-type(
+  $min-font-size,
+  $max-font-size,
+  $min-vw: variables.$min_width,
+  $max-vw: variables.$max_width
+) {
+  font-size: calc(#{$min-font-size} * 1px);
+  @media screen and (min-width: $min-vw) {
+    font-size: calc(
+      #{$min-font-size} * 1px + (#{$max-font-size} - #{$min-font-size}) *
+        ((100vw - #{$min-vw}) / #{functions.strip-unit($max-vw - $min-vw)})
+    );
+  }
+
+  @media screen and (min-width: $max-vw) {
+    font-size: calc(#{$max-font-size} * 1px);
+  }
+}
