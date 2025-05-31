@@ -2,14 +2,14 @@
   <div :class="['underline-text', 'mr-auto', 'mt-auto']">
     <slot> </slot>
     <svg
-      viewBox="0 0 1023 9"
+      viewBox="0 0 1024 6"
       xmlns="http://www.w3.org/2000/svg"
       class="underline-text__underline no-vw"
       :style="{
         'min-height': localUnderlineMinHeight,
       }"
     >
-      <rect ref="underlineRect" x="0" width="0" height="9" rx="5" />
+      <rect ref="underlineRect" x="0" y="0" width="0" height="6" rx="3" ry="3" />
     </svg>
   </div>
 </template>
@@ -163,13 +163,18 @@ defineExpose({
   white-space: nowrap;
   &__underline {
     width: 100%;
-    height: 5px;
+    height: 6px;
     position: absolute;
     left: 0;
     bottom: 0;
+    svg {
+      fill: none;
+      stroke: none;
+    }
     rect {
       stroke: none;
       fill: currentColor;
+      shape-rendering: geometricPrecision;
     }
   }
 }
