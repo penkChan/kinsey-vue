@@ -11,7 +11,9 @@ setTimeout(() => {
 
 <template>
   <!-- <RouterView /> -->
-  <ki-preloader ref="kiPreloader"></ki-preloader>
+  <Teleport to="body">
+    <ki-preloader ref="kiPreloader"></ki-preloader>
+  </Teleport>
 </template>
 
-<style scoped></style>
+<style lang="scss" scoped></style>

@@ -18,22 +18,10 @@
 import { addUnit } from '@/utils/formatter'
 import './underline-text.scss'
 import { computed, withDefaults, ref } from 'vue'
-import {
-  merge,
-  Observable,
-  Subject,
-  exhaustMap,
-  takeUntil,
-  first,
-  BehaviorSubject,
-  tap,
-  filter,
-} from 'rxjs'
-import { useRxjsComponent } from '@/composables/useRxjsComponent'
+
 import { useGlobalVariables } from '@/stores/global-variables'
 import { gsap } from 'gsap'
 
-const rxjsComponent = useRxjsComponent()
 const globalVariables = useGlobalVariables()
 
 const props = withDefaults(
@@ -48,103 +36,63 @@ const props = withDefaults(
 const localUnderlineMinHeight = computed(() => addUnit(props.underlineMinHeight))
 const underlineRect = ref<SVGRectElement>()
 
-const startSubject$ = new BehaviorSubject<boolean>(false)
-const finishSubject$ = new Subject<undefined>()
-
 function start() {
-  return rxjsComponent.mountedSubject$.pipe(
-    first(),
-    tap(() => startSubject$.next(true)),
-    exhaustMap(
-      () =>
-        new Observable((observer) => {
-          if (underlineRect.value === undefined) {
-            observer.error(new Error('underlineRect.value is undefined'))
-            return
-          }
-          const tween = gsap
-            .timeline()
-            .fromTo(
-              underlineRect.value,
-              {
-                autoAlpha: 0,
-              },
-              {
-                duration: 0.3,
-                autoAlpha: 1,
-                y: 0,
-                ease: 'power3.out',
-              },
-              '0',
-            )
-            .to(underlineRect.value, {
-              attr: {
-                width: 1024,
-              },
-              duration: 20,
-              ease: 'power3.out',
-            })
-            .to(underlineRect.value, {
-              attr: {
-                x: 1024,
-                width: 0,
-              },
-              duration: 2.4 / globalVariables.animations.timeScale.preloader,
-              ease: 'expo.inOut',
-              onComplete: () => {
-                observer.next(undefined)
-                observer.complete()
-              },
-            })
-          return () => tween.kill()
-        }),
-    ),
-    takeUntil(
-      merge(rxjsComponent.beforeUnmountSubject$, finishSubject$).pipe(
-        tap(() => startSubject$.next(false)),
-      ),
-    ),
-  )
+  if (underlineRect.value === undefined) {
+    throw new Error('underlineRect.value is undefined')
+  }
+  return gsap
+    .timeline()
+    .fromTo(
+      underlineRect.value,
+      {
+        autoAlpha: 0,
+      },
+      {
+        duration: 0.3,
+        autoAlpha: 1,
+        y: 0,
+        ease: 'power3.out',
+      },
+      '0',
+    )
+    .to(underlineRect.value, {
+      attr: {
+        width: 1024,
+      },
+      duration: 20,
+      ease: 'power3.out',
+    })
+    .to(underlineRect.value, {
+      attr: {
+        x: 1024,
+        width: 0,
+      },
+      duration: 2.4 / globalVariables.animations.timeScale.preloader,
+      ease: 'expo.inOut',
+    })
 }
 
 function finish() {
-  finishSubject$.next(undefined)
-  return startSubject$.pipe(
-    first(),
-    filter((start) => start),
-    exhaustMap(
-      () =>
-        new Observable((observer) => {
-          if (underlineRect.value === undefined) {
-            observer.error(new Error('underlineRect.value is undefined'))
-            return
-          }
-          const tween = gsap
-            .timeline()
-            .to(underlineRect.value, {
-              attr: {
-                width: 1024,
-              },
-              duration: 2.4 / globalVariables.animations.timeScale.preloader,
-              ease: 'expo.inOut',
-            })
-            .to(underlineRect.value, {
-              attr: {
-                x: 1024,
-                width: 0,
-              },
-              duration: 1.2 / globalVariables.animations.timeScale.preloader,
-              ease: 'expo.inOut',
-              onComplete: () => {
-                observer.next(undefined)
-                observer.complete()
-              },
-            })
-          return () => tween.kill()
-        }),
-    ),
-    takeUntil(merge(rxjsComponent.beforeUnmountSubject$)),
-  )
+  if (underlineRect.value === undefined) {
+    throw new Error('underlineRect.value is undefined')
+  }
+  return gsap
+    .timeline()
+    .to(underlineRect.value, {
+      attr: {
+        width: 1024,
+      },
+      duration: 2.4 / globalVariables.animations.timeScale.preloader,
+      ease: 'expo.inOut',
+    })
+    .to(underlineRect.value, {
+      attr: {
+        x: 1024,
+        width: 0,
+      },
+      duration: 1.2 / globalVariables.animations.timeScale.preloader,
+      ease: 'expo.inOut',
+    })
 }
 
 defineExpose({

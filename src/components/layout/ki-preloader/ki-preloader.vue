@@ -1,27 +1,9 @@
 <template>
-  <div
-    class="preloader preloader_header-menu-hidden mask-reveal"
-    data-arts-theme-text="light"
-    data-arts-preloader-logo="secondary"
-  >
-    <div class="mask-reveal__layer mask-reveal__layer-1">
-      <div class="mask-reveal__layer mask-reveal__layer-2">
+  <div v-show="visiblePreLoader" class="preloader">
+    <div ref="maskLayerOuter" class="mask-reveal__layer mask-reveal__layer-outer">
+      <div ref="maskLayerInner" class="mask-reveal__layer mask-reveal__layer-inner">
         <div class="preloader__wrapper">
           <underline-text ref="underlineText">{{ countValueAddZerosFormatted }}</underline-text>
-          <!-- <div
-            ref="counter"
-            :class="[
-              'preloader__counter',
-              {
-                preloader__counter_started: preloaderCounterStarted,
-              },
-              'mr-auto',
-              'mt-auto',
-              'backgrond-underline',
-            ]"
-          >
-            {{ countValueAddZerosFormatted }}
-          </div> -->
 
           <div ref="content" class="preloader__content ml-auto mt-auto">
             <div class="h6">Loading</div>
@@ -45,7 +27,6 @@ import {
   first,
   Observable,
   takeUntil,
-  merge,
   tap,
   catchError,
   of,
@@ -54,15 +35,13 @@ import {
   throwError,
 } from 'rxjs'
 import { computed, reactive, ref } from 'vue'
+import { hideMask } from '@/utils/animations/mask'
 
-const backgroundSizeHeight: string | undefined = undefined
 const count = reactive({
   width: 'auto',
   val: 0,
 })
-
-const preloaderCounterStarted = ref(true)
-
+const visiblePreLoader = ref(true)
 /**
  * 将count.val转为保留整数并添加% 如果count.val是一位数, 则在前面补一个0
  * @example 0 => 00%
@@ -77,8 +56,11 @@ const globalEventStore = useGlobalEventsStore()
 const globalVariables = useGlobalVariables()
 const content = ref<HTMLDivElement>()
 const underlineText = ref<InstanceType<typeof UnderlineText>>()
+const maskLayerOuter = ref<HTMLDivElement>()
+const maskLayerInner = ref<HTMLDivElement>()
 
 const finishedSubject$ = new Subject<undefined>()
+const preloadTl = gsap.timeline()
 
 rxjsComponent.mountedSubject$
   .pipe(
@@ -88,50 +70,47 @@ rxjsComponent.mountedSubject$
       if (underlineText.value === undefined) {
         return throwError(() => new Error('underlineText.value is undefined'))
       }
-      return merge(
-        new Observable((observer) => {
-          if (content.value === undefined) {
-            observer.error(new Error('content.value is undefined'))
-            return
-          }
-          const tween = gsap.fromTo(
-            content.value,
-            {
-              autoAlpha: 0,
-            },
-            {
-              y: 0,
-              duration: 0.3,
-              autoAlpha: 1,
-              ease: 'power3.out',
-              onComplete: () => {
-                observer.next(undefined)
-                observer.complete()
+      return new Observable((observer) => {
+        if (content.value === undefined) {
+          observer.error(new Error('content.value is undefined'))
+          return
+        }
+        if (underlineText.value === undefined) {
+          observer.error(new Error('underlineText.value is undefined'))
+          return
+        }
+        preloadTl
+          .add([
+            gsap.fromTo(
+              content.value,
+              {
+                autoAlpha: 0,
               },
-            },
-          )
-          return () => tween.kill()
-        }),
-        new Observable((observer) => {
-          const tween = gsap.to(count, {
-            val: 100,
-            duration: 20,
-            ease: 'power3.out',
-            onComplete: () => {
-              observer.next(undefined)
-              observer.complete()
-            },
+              {
+                y: 0,
+                duration: 0.3,
+                autoAlpha: 1,
+                ease: 'power3.out',
+              },
+            ),
+            gsap.to(count, {
+              val: 100,
+              duration: 20,
+              ease: 'power3.out',
+            }),
+            underlineText.value.start(),
+          ])
+          .add(() => {
+            observer.next(undefined)
+            observer.complete()
           })
-          return () => tween.kill()
-        }),
-        underlineText.value.start(),
-      )
+      })
     }),
     catchError((error) => {
       console.error(error)
       return of(undefined)
     }),
-    takeUntil(merge(rxjsComponent.beforeUnmountSubject$, finishedSubject$)),
+    takeUntil(rxjsComponent.beforeUnmountSubject$),
   )
   .subscribe({
     error: (error) => console.error(error),
@@ -143,6 +122,7 @@ combineLatest({
   finished: finishedSubject$.pipe(first()),
 })
   .pipe(
+    tap(() => preloadTl.clear()),
     switchMap(
       () =>
         new Observable((observer) => {
@@ -150,45 +130,79 @@ combineLatest({
             observer.error(new Error('content.value is undefined'))
             return
           }
-          const tween = gsap.to(content.value, {
-            y: 0,
-            autoAlpha: 1,
-            ease: 'power3.out',
-            duration: 0.3,
-            overwrite: true,
-            onComplete: () => {
+          if (underlineText.value === undefined) {
+            observer.error(new Error('underlineText.value is undefined'))
+            return
+          }
+          if (maskLayerOuter.value === undefined) {
+            observer.error(new Error('maskLayerOuter.value is undefined'))
+            return
+          }
+          if (maskLayerInner.value === undefined) {
+            observer.error(new Error('maskLayerInner.value is undefined'))
+            return
+          }
+          preloadTl
+            .to(content.value, {
+              y: 0,
+              autoAlpha: 1,
+              ease: 'power3.out',
+              duration: 0.3,
+              overwrite: true,
+            })
+            .add([
+              gsap.to(count, {
+                val: 100,
+                duration: 2.4 / globalVariables.animations.timeScale.preloader,
+                ease: 'expo.inOut',
+              }),
+              underlineText.value.finish(),
+            ])
+            .add(
+              [
+                hideMask([maskLayerOuter.value, maskLayerInner.value], {
+                  duration: 1,
+                }),
+                gsap.to(underlineText.value!.$el!, {
+                  y: -50,
+                  autoAlpha: 0,
+                  duration: 0.3,
+                }),
+                gsap.to(content.value!, {
+                  y: -50,
+                  autoAlpha: 0,
+                  duration: 0.3,
+                  delay: 0.1,
+                }),
+              ],
+              '-=0.3',
+            )
+            .add(() => {
+              visiblePreLoader.value = false
+            })
+            .add(() => {
+              globalEventStore.artsPreloaderEndSubject$.next(undefined)
+            }, '-=0.3')
+            .add(() => {
               observer.next(undefined)
               observer.complete()
-            },
-          })
-          return () => tween.kill()
+            })
+
+          return () => preloadTl.clear()
         }),
     ),
-    switchMap(() => {
-      if (underlineText.value === undefined) {
-        return throwError(() => new Error('underlineText.value is undefined'))
-      }
-      return merge(
-        new Observable((observer) => {
-          const tween = gsap.to(count, {
-            val: 100,
-            duration: 2.4 / globalVariables.animations.timeScale.preloader,
-            ease: 'expo.inOut',
-            onComplete: () => {
-              observer.complete()
-            },
-          })
-          return () => tween.kill()
-        }),
-        underlineText.value.finish(),
-      )
-    }),
     takeUntil(rxjsComponent.beforeUnmountSubject$),
   )
   .subscribe({
     error: (error) => console.error(error),
     complete: () => {},
   })
+
+rxjsComponent.beforeUnmountSubject$.pipe(first()).subscribe({
+  next: () => {
+    preloadTl.kill()
+  },
+})
 
 function finished() {
   finishedSubject$.next(undefined)
@@ -214,13 +228,22 @@ defineExpose({
   z-index: 400;
   overflow: hidden;
   color: var(--color-gray-2);
-  .mask-reveal__layer-1 {
+  .mask-reveal__layer-outer {
     background-color: var(--color-dark-1);
+  }
+  .mask-reveal__layer {
+    display: block;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
   }
   &__wrapper {
     display: flex;
     flex-wrap: wrap;
     position: fixed;
+    justify-content: space-between;
     top: var(--gutter-vertical);
     left: var(--gutter-horizontal);
     right: var(--gutter-horizontal);
@@ -234,30 +257,9 @@ defineExpose({
     letter-spacing: -10px;
     white-space: nowrap;
   }
-  .backgrond-underline {
-    width: 100px;
-    &.preloader__counter {
-      &_started {
-        animation-name: loading;
-        animation-duration: 20s;
-        transition: background-size 1.2s ease;
-      }
-      &_paused {
-        animation-play-state: paused;
-      }
-      &_ended {
-        animation-duration: 1s;
-      }
-    }
-
-    @keyframes loading {
-      0% {
-        background-size: 0% 2px;
-      }
-      100% {
-        background-size: 100% 2px;
-      }
-    }
+  &__content {
+    align-self: flex-end;
+    font-size: 30px;
   }
   .underline-text {
     font-size: 150px;

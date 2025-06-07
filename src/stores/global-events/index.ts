@@ -3,6 +3,7 @@ import { merge, Subject } from 'rxjs'
 
 export const useGlobalEventsStore = defineStore('globalEvents', () => {
   const artsPreloaderStartSubject$ = new Subject<undefined>()
+  const artsPreloaderEndSubject$ = new Subject<undefined>()
 
   const resizeSubject$ = new Subject<undefined | UIEvent>()
   const orientationchangeSubject$ = new Subject<undefined | Event>()
@@ -21,5 +22,6 @@ export const useGlobalEventsStore = defineStore('globalEvents', () => {
     resizeSubject$,
     orientationchangeSubject$,
     mergedAllResizeEventSubject$,
+    artsPreloaderEndSubject$,
   }
 })
